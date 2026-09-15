@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkingAI — Predictive parking, minutes before you arrive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1F2E;
+    --ink-2:#122E44;
+    --amber:#FFA630;
+    --amber-dim:#B97A28;
+    --concrete:#EDEEF0;
+    --paper:#FFFFFF;
+    --graphite:#15232C;
+    --slate:#5C6E77;
+    --line:#D8DCDE;
+    --open:#2F9E68;
+    --occupied:#B24B37;
+
+    --display:'Barlow Condensed', sans-serif;
+    --body:'Inter', sans-serif;
+
+    --maxw:1180px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
+  }
+
+  body{
+    margin:0;
+    font-family:var(--body);
+    color:var(--graphite);
+    background:var(--concrete);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  h1,h2,h3,.num{ font-family:var(--display); font-weight:700; margin:0; letter-spacing:0.2px; }
+
+  a{ color:inherit; }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:0 28px; }
+  section{ padding:100px 0; }
+  @media (max-width:720px){ section{ padding:64px 0; } .wrap{ padding:0 20px; } }
+
+  :focus-visible{ outline:3px solid var(--amber); outline-offset:3px; }
+
+  /* ---------- Nav ---------- */
+  header.nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(11,31,46,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .nav-row{
+    display:flex; align-items:center; justify-content:space-between;
+    height:68px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:9px;
+    font-family:var(--display); font-weight:700; font-size:22px; color:#fff;
+    text-decoration:none;
+  }
+  .brand-dot{
+    width:9px; height:9px; border-radius:50%; background:var(--amber);
+    box-shadow:0 0 0 4px rgba(255,166,48,0.18);
+  }
+  nav.links{ display:flex; gap:34px; }
+  nav.links a{
+    color:#C9D6DE; text-decoration:none; font-size:15.5px; font-weight:500;
+    padding:6px 2px; border-bottom:2px solid transparent;
+  }
+  nav.links a:hover{ color:#fff; border-color:var(--amber); }
+  .nav-cta{
+    background:var(--amber); color:#231404; font-weight:600; font-size:14.5px;
+    padding:10px 18px; border-radius:7px; text-decoration:none; border:none;
+    cursor:pointer;
+  }
+  .nav-cta:hover{ background:#ffb655; }
+  .burger{ display:none; background:none; border:none; cursor:pointer; padding:8px; }
+  .burger span{ display:block; width:22px; height:2px; background:#fff; margin:5px 0; }
+  .mobile-panel{ display:none; flex-direction:column; gap:2px; padding:10px 0 18px; }
+  .mobile-panel a{ color:#EAF0F4; text-decoration:none; padding:12px 4px; font-size:16px; border-top:1px solid rgba(255,255,255,0.08); }
+
+  @media (max-width:860px){
+    nav.links{ display:none; }
+    .nav-cta{ display:none; }
+    .burger{ display:block; }
+    header.nav.open .mobile-panel{ display:flex; }
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    background:radial-gradient(ellipse at 15% -10%, #163C57 0%, var(--ink) 55%);
+    color:#fff;
+    padding:88px 0 96px;
+  }
+  .hero-grid{
+    display:grid; grid-template-columns:1.05fr 0.95fr; gap:56px; align-items:center;
+  }
+  @media (max-width:900px){ .hero-grid{ grid-template-columns:1fr; gap:48px; } }
+
+  .kicker{ color:var(--amber); font-weight:600; font-size:15px; margin-bottom:16px; }
+  .hero h1{
+    font-size:clamp(40px, 5.4vw, 62px);
+    line-height:1.03;
+    color:#fff;
+  }
+  .hero p.lede{
+    font-family:var(--body); font-size:18px; line-height:1.6; color:#C4D3DC;
+    max-width:46ch; margin:22px 0 32px;
+  }
+  .hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; }
+  .btn-primary{
+    background:var(--amber); color:#231404; font-weight:600; font-size:15.5px;
+    padding:13px 22px; border-radius:7px; text-decoration:none; border:none; cursor:pointer;
+  }
+  .btn-primary:hover{ background:#ffb655; }
+  .btn-ghost{
+    background:transparent; color:#fff; font-weight:600; font-size:15.5px;
+    padding:12px 22px; border-radius:7px; text-decoration:none; border:1px solid rgba(255,255,255,0.35);
+  }
+  .btn-ghost:hover{ border-color:#fff; }
+
+  /* occupancy demo grid */
+  .demo-card{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:14px;
+    padding:22px;
+  }
+  .demo-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; }
+  .demo-head h3{ font-family:var(--body); font-weight:600; font-size:14.5px; color:#EAF0F4; }
+  .demo-head span{ font-size:12.5px; color:#8CA3B1; }
+  .cell-grid{
+    display:grid; grid-template-columns:repeat(9, 1fr); gap:6px;
+  }
+  .cell{
+    aspect-ratio:1/1; border-radius:4px; border:none; cursor:pointer; padding:0;
+    background:var(--occupied);
+    transition:transform 0.15s ease;
+  }
+  .cell:hover{ transform:scale(1.12); }
+  .cell[data-state="open"]{ background:var(--open); }
+  .cell[data-state="soon"]{ background:var(--amber); animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.68; } }
+
+  .legend{ display:flex; gap:18px; flex-wrap:wrap; margin-top:16px; }
+  .legend-item{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:#B7C6CF; }
+  .swatch{ width:11px; height:11px; border-radius:3px; }
+  .swatch.occupied{ background:var(--occupied); }
+  .swatch.open{ background:var(--open); }
+  .swatch.soon{ background:var(--amber); }
+  .demo-hint{ font-size:12px; color:#7C93A2; margin-top:14px; }
+
+  /* ---------- Stat strip ---------- */
+  .stat-strip{ background:var(--ink-2); color:#fff; padding:52px 0; }
+  .stat-row{ display:flex; flex-wrap:wrap; }
+  .stat{ flex:1 1 200px; padding:0 30px; position:relative; }
+  .stat + .stat{ border-left:1px solid rgba(255,255,255,0.14); }
+  @media (max-width:720px){
+    .stat{ border-left:none !important; padding:18px 0; border-top:1px solid rgba(255,255,255,0.14); }
+    .stat:first-child{ border-top:none; }
+  }
+  .stat .num{ font-size:44px; color:var(--amber); line-height:1; }
+  .stat .label{ font-size:14px; color:#B7C6CF; margin-top:8px; max-width:26ch; }
+
+  /* ---------- Section headers ---------- */
+  .section-head{ max-width:640px; margin-bottom:56px; }
+  .section-head h2{ font-size:clamp(30px,3.4vw,40px); color:var(--graphite); line-height:1.08; }
+  .section-head p{ font-size:16.5px; color:var(--slate); line-height:1.6; margin-top:14px; }
+
+  /* ---------- How it works ---------- */
+  .flow{ position:relative; }
+  .flow-line{
+    position:absolute; left:0; right:0; top:38px; height:3px;
+    background-image:repeating-linear-gradient(to right, var(--graphite) 0 22px, transparent 22px 38px);
+    opacity:0.18;
+  }
+  @media (max-width:820px){ .flow-line{ display:none; } }
+  .flow-steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:28px; position:relative; }
+  @media (max-width:820px){ .flow-steps{ grid-template-columns:1fr; gap:34px; } }
+  .flow-step .marker{
+    width:76px; height:76px; border-radius:50%; background:var(--ink);
+    color:var(--amber); font-family:var(--display); font-size:28px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; margin-bottom:20px;
+  }
+  .flow-step h3{ font-family:var(--body); font-size:18px; font-weight:600; margin-bottom:8px; }
+  .flow-step p{ font-size:14.5px; line-height:1.6; color:var(--slate); margin:0; max-width:32ch; }
+
+  /* ---------- Features (bento) ---------- */
+  .bento{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    grid-template-rows:repeat(2, minmax(190px, auto));
+    gap:18px;
+  }
+  .tile{
+    background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:28px;
+    display:flex; flex-direction:column; transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .tile:hover{ border-color:var(--amber-dim); box-shadow:0 10px 28px rgba(11,31,46,0.08); }
+  .tile-icon{ color:var(--ink); margin-bottom:16px; }
+  .tile h3{ font-family:var(--body); font-weight:600; font-size:17.5px; margin-bottom:8px; }
+  .tile p{ font-size:14.5px; line-height:1.6; color:var(--slate); margin:0; }
+  .tile.big{ grid-column:1 / 3; grid-row:1 / 3; }
+  .tile.s1{ grid-column:3; grid-row:1; }
+  .tile.s2{ grid-column:4; grid-row:1; }
+  .tile.s3{ grid-column:3; grid-row:2; }
+  .tile.s4{ grid-column:4; grid-row:2; }
+  @media (max-width:900px){
+    .bento{ grid-template-columns:1fr; grid-template-rows:none; }
+    .tile.big,.tile.s1,.tile.s2,.tile.s3,.tile.s4{ grid-column:auto; grid-row:auto; }
+  }
+
+  /* hourly bar chart inside big tile */
+  .hourly{ display:flex; align-items:flex-end; gap:5px; height:84px; margin:18px 0 8px; }
+  .hourly .bar{ flex:1; background:var(--ink); border-radius:3px 3px 0 0; opacity:0.85; }
+  .hourly .bar.peak{ background:var(--amber); opacity:1; }
+  .hourly-labels{ display:flex; justify-content:space-between; font-size:11px; color:var(--slate); margin-bottom:6px; }
+
+  /* ---------- Impact ---------- */
+  .impact{ background:var(--ink); color:#fff; }
+  .impact .section-head h2{ color:#fff; }
+  .impact .section-head p{ color:#B7C6CF; }
+  .compare{ display:grid; grid-template-columns:1fr 1fr; gap:40px; }
+  @media (max-width:760px){ .compare{ grid-template-columns:1fr; gap:30px; } }
+  .compare-block h4{ font-family:var(--body); font-weight:600; font-size:15px; color:#EAF0F4; margin:0 0 16px; }
+  .bar-row{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .bar-row .bar-label{ width:118px; font-size:13.5px; color:#B7C6CF; flex-shrink:0; }
+  .bar-track{ flex:1; background:rgba(255,255,255,0.1); border-radius:5px; height:14px; overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:5px; }
+  .bar-fill.before{ background:#6E828D; }
+  .bar-fill.after{ background:var(--amber); }
+  .bar-value{ width:52px; text-align:right; font-family:var(--display); font-size:16px; color:#fff; flex-shrink:0; }
+  .impact-note{ font-size:13px; color:#7C93A2; margin-top:28px; font-style:italic; }
+
+  /* ---------- Roadmap ---------- */
+  .road{ position:relative; padding-top:10px; }
+  .road-line{
+    position:relative; height:10px; border-radius:6px; background:#2A3A44;
+    margin:0 20px;
+  }
+  .road-line::after{
+    content:""; position:absolute; top:50%; left:0; right:0; height:2px; transform:translateY(-50%);
+    background-image:repeating-linear-gradient(to right, #fff 0 16px, transparent 16px 30px);
+    opacity:0.75;
+  }
+  .markers{ display:flex; justify-content:space-between; position:relative; margin:0 20px; }
+  .marker-pin{
+    width:34px; height:34px; border-radius:50%; background:var(--amber); color:#231404;
+    font-family:var(--display); font-weight:700; font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+    margin-top:-22px; border:4px solid var(--concrete);
+  }
+  .phase-cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:24px; margin-top:34px; }
+  @media (max-width:820px){ .phase-cards{ grid-template-columns:1fr; } }
+  .phase-cards .weeks{ font-size:13px; font-weight:600; color:var(--amber-dim); margin-bottom:6px; }
+  .phase-cards h3{ font-family:var(--body); font-size:17px; font-weight:600; margin-bottom:8px; }
+  .phase-cards p{ font-size:14px; color:var(--slate); line-height:1.55; margin:0; }
+
+  /* ---------- Footer ---------- */
+  footer{ background:var(--ink-2); color:#C4D3DC; padding:56px 0 34px; }
+  .foot-row{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:24px; align-items:flex-start; }
+  .foot-brand{ font-family:var(--display); font-weight:700; font-size:22px; color:#fff; }
+  .foot-tag{ font-size:13.5px; color:#8CA3B1; margin-top:8px; max-width:36ch; line-height:1.6; }
+  .foot-links{ display:flex; gap:28px; flex-wrap:wrap; }
+  .foot-links a{ color:#C4D3DC; text-decoration:none; font-size:14.5px; }
+  .foot-links a:hover{ color:#fff; }
+  .foot-bottom{ margin-top:40px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1); font-size:12.5px; color:#7C93A2; }
+
+/* ===== HACKATHON DEMO UPGRADE ===== */
+.ai-dashboard{background:#f6f7f8;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:72px 0}
+.dashboard-top{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:26px}
+.dashboard-top h2{margin:0 0 7px;font-size:clamp(34px,4vw,52px);line-height:.98}
+.dashboard-top p{margin:0;color:var(--slate);max-width:680px}
+.live-pill{display:inline-flex;align-items:center;gap:8px;border:1px solid #cfd6d9;background:#fff;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:700;white-space:nowrap}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--open);box-shadow:0 0 0 4px rgba(47,158,104,.12)}
+.metric-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+.metric{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;min-height:105px}
+.metric .metric-label{font-size:12px;color:var(--slate);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.metric .metric-value{font-size:31px;font-weight:800;margin-top:7px;color:var(--ink)}
+.metric .metric-sub{font-size:11px;color:var(--slate);margin-top:3px}
+.parking-console{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.8fr);gap:18px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 8px 25px rgba(11,31,46,.04)}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:16px}.panel-head h3{margin:0;font-size:20px}.panel-head span{font-size:12px;color:var(--slate)}
+.zone-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:17px}.zone-tab{border:1px solid var(--line);background:#fff;padding:9px 12px;border-radius:9px;font:600 12px var(--body);cursor:pointer}.zone-tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.slot-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+.slot{min-height:62px;border:1px solid #d8dcde;border-radius:10px;background:#eef1f2;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;font-size:12px;font-weight:800;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.slot:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgba(11,31,46,.1)}.slot small{font-size:9px;font-weight:600;color:var(--slate)}.slot.open{background:#e7f5ee;border-color:#b9dfcb;color:#176440}.slot.open small{color:#2f9e68}.slot.soon{background:#fff5df;border-color:#efd79e;color:#8c5a13}.slot.soon small{color:#b97a28}.slot.occupied{background:#f7e9e6;border-color:#e3c0b8;color:#8b3829}.slot.occupied small{color:#b24b37}.slot.reserved{background:#e9eef7;border-color:#c6d2e4;color:#27466d}.slot.reserved small{color:#53759f}
+.recommendation{background:var(--ink);color:#fff;border-radius:13px;padding:18px;margin-bottom:15px}.recommendation .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.12em;opacity:.65;font-weight:800}.recommendation h3{font-size:32px;margin:5px 0 2px}.recommendation p{font-size:12px;opacity:.75;margin:0 0 14px}.score{display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.14);padding-top:12px}.score strong{font-size:25px;color:#fff}.score span{font-size:11px;opacity:.7}
+.action-row{display:flex;gap:8px;flex-wrap:wrap}.demo-btn{border:0;border-radius:9px;padding:11px 14px;font:700 12px var(--body);cursor:pointer}.demo-btn.primary{background:var(--amber);color:var(--ink)}.demo-btn.secondary{background:#edf0f1;color:var(--ink)}
+.forecast-list{display:grid;gap:9px}.forecast-row{display:grid;grid-template-columns:58px 1fr 55px;align-items:center;gap:10px;font-size:12px}.forecast-bar{height:9px;background:#edf0f1;border-radius:99px;overflow:hidden}.forecast-fill{height:100%;background:var(--amber);border-radius:99px;transition:width .4s ease}.forecast-row strong{text-align:right}.status-message{font-size:12px;color:var(--slate);min-height:18px;margin-top:10px}
+.iot{margin-top:18px;display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.sensor-list{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.sensor{border:1px solid var(--line);border-radius:11px;padding:12px;background:#fafbfb}.sensor-top{display:flex;justify-content:space-between;font-size:11px;color:var(--slate)}.sensor strong{display:block;font-size:21px;margin-top:6px}.online{font-size:10px;color:var(--open);font-weight:800}.demo-disclaimer{font-size:11px;color:var(--slate);margin-top:15px}
+@media(max-width:900px){.metric-grid{grid-template-columns:repeat(2,1fr)}.parking-console,.iot{grid-template-columns:1fr}.slot-grid{grid-template-columns:repeat(5,1fr)}}
+@media(max-width:560px){.dashboard-top{display:block}.live-pill{margin-top:15px}.metric-grid{grid-template-columns:1fr 1fr}.slot-grid{grid-template-columns:repeat(3,1fr)}.sensor-list{grid-template-columns:1fr 1fr}.metric .metric-value{font-size:25px}}
+
+</style>
+
+<style id="destination-parking-style">
+.destination-parking{padding:90px 5vw;background:#f4f0e7;border-top:1px solid #d8d0c1}
+.dp-wrap{max-width:1180px;margin:auto}
+.dp-head{display:flex;justify-content:space-between;gap:30px;align-items:end;margin-bottom:28px}
+.dp-head h2{font-size:clamp(38px,5vw,68px);line-height:.95;margin:8px 0;letter-spacing:-1px}
+.dp-kicker{font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#9b6b18}
+.dp-search{display:flex;gap:10px;margin:22px 0;max-width:720px}
+.dp-search input{flex:1;padding:16px 18px;border:1px solid #b9b09f;background:#fff;font:inherit;border-radius:8px;outline:none}
+.dp-search button,.dp-action{border:0;background:#171717;color:#fff;padding:15px 20px;border-radius:8px;font-weight:800;cursor:pointer}
+.dp-search button:hover,.dp-action:hover{transform:translateY(-1px)}
+.dp-suggestions{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 28px}
+.dp-chip{border:1px solid #c8c0b1;background:#fff;padding:10px 13px;border-radius:999px;cursor:pointer;font-weight:700}
+.dp-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:22px}
+.dp-card{background:#fff;border:1px solid #d8d0c1;border-radius:14px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.05)}
+.dp-place{display:flex;justify-content:space-between;gap:15px;align-items:start}
+.dp-place h3{font-size:30px;margin:0 0 5px}
+.dp-status{font-size:13px;font-weight:900;padding:8px 10px;border-radius:999px;background:#dff1df;color:#21642a;white-space:nowrap}
+.dp-status.busy{background:#fff0c9;color:#8a5b00}
+.dp-status.full{background:#f7d9d9;color:#8d2424}
+.dp-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}
+.dp-metric{background:#f7f4ed;padding:15px;border-radius:10px}
+.dp-metric strong{display:block;font-size:28px}
+.dp-metric span{font-size:12px;color:#625e56}
+.dp-forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.dp-forecast div{padding:12px 8px;text-align:center;border:1px solid #e2ddd3;border-radius:8px}
+.dp-forecast b{display:block;font-size:20px}
+.dp-map{position:relative;min-height:350px;background:#e8e3d9;border-radius:12px;overflow:hidden;border:1px solid #d1c9bb}
+.dp-road{position:absolute;background:#fff;border:1px solid #d0c8ba}
+.dp-road.r1{left:0;right:0;top:44%;height:64px}.dp-road.r2{top:0;bottom:0;left:45%;width:62px}
+.dp-pin{position:absolute;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#171717;color:#fff;font-size:16px;font-weight:900;z-index:3;box-shadow:0 4px 12px #0003}
+.dp-pin.restaurant{left:72%;top:28%;background:#9b6b18}.dp-pin.parking{left:28%;top:68%;background:#24733b}
+.dp-route{position:absolute;left:31%;top:34%;width:43%;height:34%;border-left:5px dashed #9b6b18;border-bottom:5px dashed #9b6b18;border-radius:0 0 0 70px;z-index:2}
+.dp-label{position:absolute;background:#fff;padding:6px 9px;border-radius:6px;font-size:11px;font-weight:800;box-shadow:0 2px 8px #0002;z-index:4}
+.dp-label.restaurant{left:61%;top:17%}.dp-label.parking{left:15%;top:76%}
+.dp-note{font-size:12px;color:#716b61;line-height:1.5;margin-top:14px}
+.dp-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.dp-action.secondary{background:#eee9df;color:#171717}
+.dp-result{margin-top:12px;font-weight:800}
+@media(max-width:800px){.dp-grid{grid-template-columns:1fr}.dp-head{display:block}.dp-metrics{grid-template-columns:1fr 1fr}.dp-forecast{grid-template-columns:repeat(2,1fr)}}
+</style>
+
+</head>
+<body>
+
+<header class="nav" id="siteNav">
+  <div class="wrap nav-row">
+    <a href="#top" class="brand"><span class="brand-dot"></span>ParkingAI</a>
+    <nav class="links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#impact">Impact</a>
+      <a href="#roadmap">Roadmap</a>
+    </nav>
+    <a href="#demo" class="nav-cta">Try the demo</a>
+    <button class="burger" id="burgerBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="wrap mobile-panel" id="mobilePanel">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#impact">Impact</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#demo">Try the demo</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero" id="demo">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="kicker">AI-powered smart parking</div>
+        <h1>Stop circling the block.</h1>
+        <p class="lede">ParkingAI reads live sensor and camera data, predicts which spots will open up next, and routes drivers straight there — before they even see the lot.</p>
+        <div class="hero-ctas">
+          <a href="#how" class="btn-primary">See how it works</a>
+          <a href="#destination-parking" class="btn-ghost">Try live demo</a>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-head">
+          <h3>Lot 4 — Main Street Garage</h3>
+          <span id="occupancyReadout">Live</span>
+        </div>
+        <div class="cell-grid" id="cellGrid"></div>
+        <div class="legend">
+          <div class="legend-item"><span class="swatch occupied"></span>Occupied</div>
+          <div class="legend-item"><span class="swatch open"></span>Open now</div>
+          <div class="legend-item"><span class="swatch soon"></span>Opening soon — predicted</div>
+        </div>
+        <p class="demo-hint">Click any bay to see how it's read — this is a working sketch of the live map, not real garage data.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- HACKATHON INTERACTIVE CONTROL CENTER -->
+  <section class="ai-dashboard" id="control-center">
+    <div class="wrap">
+      <div class="dashboard-top">
+        <div>
+          <div class="kicker">Interactive prototype</div>
+          <h2>ParkingAI Control Center</h2>
+          <p>Simulate the complete journey: monitor parking slots, let the AI rank the best space, reserve it, and watch the live dashboard update.</p>
+        </div>
+        <div class="live-pill"><span class="live-dot"></span><span id="systemStatus">SYSTEM ONLINE</span></div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><div class="metric-label">Total slots</div><div class="metric-value" id="mTotal">30</div><div class="metric-sub">Across 3 zones</div></div>
+        <div class="metric"><div class="metric-label">Available now</div><div class="metric-value" id="mOpen">—</div><div class="metric-sub" id="mOpenSub">Updating…</div></div>
+        <div class="metric"><div class="metric-label">Occupancy</div><div class="metric-value" id="mOcc">—</div><div class="metric-sub">Live estimate</div></div>
+        <div class="metric"><div class="metric-label">Best ParkScore</div><div class="metric-value" id="mScore">—</div><div class="metric-sub">AI recommendation</div></div>
+        <div class="metric"><div class="metric-label">Prediction</div><div class="metric-value" id="mPred">—</div><div class="metric-sub">Open slots in 30 min</div></div>
+      </div>
+
+      <div class="parking-console">
+        <div class="panel">
+          <div class="panel-head"><h3>Live slot map</h3><span id="zoneSummary">Main Parking</span></div>
+          <div class="zone-tabs" role="tablist">
+            <button class="zone-tab active" data-zone="Main Parking">Main Parking</button>
+            <button class="zone-tab" data-zone="Faculty Parking">Faculty Parking</button>
+            <button class="zone-tab" data-zone="Visitor Parking">Visitor Parking</button>
+          </div>
+          <div class="slot-grid" id="smartSlotGrid"></div>
+          <div class="legend" style="margin-top:15px"><div class="legend-item"><span class="swatch occupied"></span>Occupied</div><div class="legend-item"><span class="swatch open"></span>Available</div><div class="legend-item"><span class="swatch soon"></span>Opening soon</div><div class="legend-item"><span class="swatch" style="background:#9bb0ca"></span>Reserved</div></div>
+          <div class="status-message" id="demoMessage">Select a zone or use “Find Best Slot” to start the demo.</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>AI recommendation</h3><span>ParkScore™</span></div>
+          <div class="recommendation">
+            <div class="eyebrow">Best available match</div>
+            <h3 id="bestSlot">—</h3>
+            <p id="bestReason">Click Find Best Slot to analyze available spaces.</p>
+            <div class="score"><span>AI suitability score</span><strong id="bestScore">—/100</strong></div>
+          </div>
+          <div class="action-row"><button class="demo-btn primary" id="findBest">Find Best Slot</button><button class="demo-btn secondary" id="reserveBest">Reserve Slot</button><button class="demo-btn secondary" id="resetDemo">Reset Demo</button></div>
+          <div class="demo-disclaimer">Prototype mode: slot states and sensor readings are simulated for demonstration. No real parking facility is connected.</div>
+        </div>
+      </div>
+
+      <div class="iot">
+        <div class="panel">
+          <div class="panel-head"><h3>30-minute availability forecast</h3><span>AI prediction</span></div>
+          <div class="forecast-list" id="forecastList"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>IoT sensor network</h3><span id="sensorUpdate">Updated just now</span></div>
+          <div class="sensor-list">
+            <div class="sensor"><div class="sensor-top"><span>ESP32-01</span><span class="online">● ONLINE</span></div><strong id="sensor1">96%</strong><div class="metric-sub">Sensor health</div></div>
+            <div class="sensor"><div class="sensor-top"><span>ESP32-02</span><span class="online">● ONLINE</span></div><strong id="sensor2">92%</strong><div class="metric-sub">Sensor health</div></div>
+            <div class="sensor"><div class="sensor-top"><span>Camera AI</span><span class="online">● ONLINE</span></div><strong id="sensor3">98%</strong><div class="metric-sub">Detection confidence</div></div>
+          </div>
+          <div class="demo-disclaimer">Concept architecture: ESP32/ultrasonic sensors or CCTV feed → AI detection → backend → live dashboard.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAT STRIP -->
+  <section class="stat-strip">
+    <div class="wrap stat-row">
+      <div class="stat">
+        <div class="num">30%</div>
+        <div class="label">of urban traffic is drivers searching for a parking spot</div>
+      </div>
+      <div class="stat">
+        <div class="num">17 min</div>
+        <div class="label">average time spent finding a spot in dense areas</div>
+      </div>
+      <div class="stat">
+        <div class="num">~1B L</div>
+        <div class="label">fuel wasted worldwide every year on parking searches</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>From an empty bay to a routed driver, in four steps.</h2>
+        <p>ParkingAI doesn't guess — it watches, learns, and predicts, then puts that prediction directly in front of the driver who needs it.</p>
+      </div>
+      <div class="flow">
+        <div class="flow-line" aria-hidden="true"></div>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="marker">1</div>
+            <h3>Sensors watch every bay</h3>
+            <p>Ultrasonic sensors and existing CCTV feeds detect whether each space is occupied, updated in real time.</p>
+          </div>
+          <div class="flow-step">
+            <div class="marker">2</div>
+            <h3>Data streams to the cloud</h3>
+            <p>Every reading is timestamped and pushed into a central pipeline the moment it happens.</p>
+          </div>
+          <div class="flow-step">
+            <div class="marker">3</div>
+            <h3>The model looks ahead</h3>
+            <p>A prediction engine blends live readings with historical patterns to forecast what opens up next.</p>
+          </div>
+          <div class="flow-step">
+            <div class="marker">4</div>
+            <h3>Drivers get routed there</h3>
+            <p>The app shows the most likely open spot on a live map and guides the driver straight to it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" style="background:var(--paper);">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Built around one question: where can I park right now?</h2>
+        <p>Every feature exists to answer that question faster, or to help operators plan for the answer.</p>
+      </div>
+      <div class="bento">
+        <div class="tile big">
+          <div class="tile-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.58 7-12a7 7 0 1 0-14 0c0 4.42 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg>
+          </div>
+          <h3>Live availability map</h3>
+          <p>A color-coded map of nearby lots, ranked by how many spots are predicted to be open when the driver arrives.</p>
+          <div class="hourly-labels"><span>6am</span><span>9am</span><span>12pm</span><span>3pm</span><span>6pm</span><span>9pm</span></div>
+          <div class="hourly" id="hourlyChart"></div>
+          <p style="font-size:12.5px; color:var(--slate); margin-top:2px;">Predicted occupancy across a typical weekday</p>
+        </div>
+        <div class="tile s1">
+          <div class="tile-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+          </div>
+          <h3>Time-ahead forecast</h3>
+          <p>See predicted availability up to an hour before you arrive, not just what's open this second.</p>
+        </div>
+        <div class="tile s2">
+          <div class="tile-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="5.5" r="2"/><path d="M6 16.7c0-5.6 3.8-5.6 5.5-8.4S15 5 16.8 5.4"/></svg>
+          </div>
+          <h3>Turn-by-turn guidance</h3>
+          <p>Once a spot is picked, the app routes the driver directly to it — no more slow laps of the block.</p>
+        </div>
+        <div class="tile s3">
+          <div class="tile-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="11"/><line x1="11" y1="20" x2="11" y2="5"/><line x1="17" y1="20" x2="17" y2="14"/></svg>
+          </div>
+          <h3>Demand analytics</h3>
+          <p>Operators see occupancy trends over time to plan pricing, staffing, and capacity.</p>
+        </div>
+        <div class="tile s4">
+          <div class="tile-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0"/></svg>
+          </div>
+          <h3>Push alerts</h3>
+          <p>Get notified the moment a preferred lot opens up, or when it's about to fill.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IMPACT -->
+  <section class="impact" id="impact">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>What better predictions are worth.</h2>
+        <p>Projected outcomes based on comparable smart-parking pilots — the numbers ParkingAI is designed to move.</p>
+      </div>
+      <div class="compare">
+        <div class="compare-block">
+          <h4>Average time spent finding a spot</h4>
+          <div class="bar-row">
+            <div class="bar-label">Before</div>
+            <div class="bar-track"><div class="bar-fill before" style="width:100%;"></div></div>
+            <div class="bar-value">17m</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">With ParkingAI</div>
+            <div class="bar-track"><div class="bar-fill after" style="width:60%;"></div></div>
+            <div class="bar-value">10m</div>
+          </div>
+        </div>
+        <div class="compare-block">
+          <h4>Traffic share spent cruising for parking</h4>
+          <div class="bar-row">
+            <div class="bar-label">Before</div>
+            <div class="bar-track"><div class="bar-fill before" style="width:100%;"></div></div>
+            <div class="bar-value">30%</div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label">With ParkingAI</div>
+            <div class="bar-track"><div class="bar-fill after" style="width:60%;"></div></div>
+            <div class="bar-value">18%</div>
+          </div>
+        </div>
+      </div>
+      <p class="impact-note">Targets, not guarantees — final figures depend on city-scale validation during the pilot phase.</p>
+    </div>
+  </section>
+
+  <!-- ROADMAP -->
+  <section id="roadmap">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>From prototype to pilot in ten weeks.</h2>
+        <p>The build plan behind this project, phase by phase.</p>
+      </div>
+      <div class="road">
+        <div class="road-line" aria-hidden="true"></div>
+        <div class="markers" aria-hidden="true">
+          <div class="marker-pin">1</div>
+          <div class="marker-pin">2</div>
+          <div class="marker-pin">3</div>
+          <div class="marker-pin">4</div>
+        </div>
+      </div>
+      <div class="phase-cards">
+        <div>
+          <div class="weeks">Weeks 1–2</div>
+          <h3>Requirement analysis</h3>
+          <p>Survey candidate lots, choose sensor and camera hardware, define the data schema.</p>
+        </div>
+        <div>
+          <div class="weeks">Weeks 3–5</div>
+          <h3>Data &amp; model training</h3>
+          <p>Collect baseline occupancy data and train the prediction model on it.</p>
+        </div>
+        <div>
+          <div class="weeks">Weeks 6–8</div>
+          <h3>App development</h3>
+          <p>Build the live map, the forecast view, and the cloud serving layer behind them.</p>
+        </div>
+        <div>
+          <div class="weeks">Weeks 9–10</div>
+          <h3>Pilot &amp; evaluation</h3>
+          <p>Deploy to a test lot and measure prediction accuracy against real outcomes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-row">
+      <div>
+        <div class="foot-brand">ParkingAI</div>
+        <p class="foot-tag">An academic project exploring AI-driven prediction of real-time parking availability.</p>
+      </div>
+      <div class="foot-links">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#impact">Impact</a>
+        <a href="#roadmap">Roadmap</a>
+      </div>
+    </div>
+    <div class="foot-bottom">Built as a course project. Figures on this page are illustrative targets, not measured results.</div>
+  </div>
+</footer>
+
+<script>
+  // Mobile nav toggle
+  const burger = document.getElementById('burgerBtn');
+  const navEl = document.getElementById('siteNav');
+  burger.addEventListener('click', () => {
+    const isOpen = navEl.classList.toggle('open');
+    burger.setAttribute('aria-expanded', String(isOpen));
+  });
+  document.getElementById('mobilePanel').addEventListener('click', (e) => {
+    if (e.target.tagName === 'A') { navEl.classList.remove('open'); burger.setAttribute('aria-expanded','false'); }
+  });
+
+  // Build interactive occupancy grid
+  const GRID_SIZE = 45; // 9 columns
+  const states = ['occupied','occupied','occupied','open','soon'];
+  const grid = document.getElementById('cellGrid');
+  const cells = [];
+
+  function randomState(){
+    return states[Math.floor(Math.random() * states.length)];
+  }
+
+  for (let i = 0; i < GRID_SIZE; i++){
+    const btn = document.createElement('button');
+    btn.className = 'cell';
+    const s = randomState();
+    btn.dataset.state = s;
+    btn.setAttribute('aria-label', 'Parking bay ' + (i + 1) + ', ' + s);
+    btn.addEventListener('click', () => {
+      const order = ['occupied','open','soon'];
+      const next = order[(order.indexOf(btn.dataset.state) + 1) % order.length];
+      btn.dataset.state = next;
+      btn.setAttribute('aria-label', 'Parking bay ' + (i + 1) + ', ' + next);
+    });
+    grid.appendChild(btn);
+    cells.push(btn);
+  }
+
+  // Ambient "live" flicker — a few cells change state periodically
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduceMotion){
+    setInterval(() => {
+      const idx = Math.floor(Math.random() * cells.length);
+      const c = cells[idx];
+      const next = randomState();
+      c.dataset.state = next;
+    }, 1400);
+  }
+
+  // Hourly bar chart for the "big" feature tile
+  const hourly = document.getElementById('hourlyChart');
+  const heights = [18, 22, 55, 78, 92, 70, 58, 50, 62, 85, 74, 30];
+  const peakIndex = heights.indexOf(Math.max(...heights));
+  heights.forEach((h, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'bar' + (i === peakIndex ? ' peak' : '');
+    bar.style.height = h + '%';
+    hourly.appendChild(bar);
+  });
+
+  // Robust in-page navigation: handle all "#id" links via JS scroll instead of
+  // relying on default anchor navigation, which some sandboxed preview frames block.
+  document.querySelectorAll('a[href^="#"]').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      const id = link.getAttribute('href').slice(1);
+      const target = document.getElementById(id);
+      if (!target) return;
+      e.preventDefault();
+      const navHeight = navEl.offsetHeight;
+      const top = target.getBoundingClientRect().top + window.pageYOffset - navHeight - 12;
+      window.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
+      history.replaceState(null, '', '#' + id);
+    });
+  });
+</script>
+
+
+<script>
+/* ParkingAI Hackathon Control Center */
+(() => {
+  const zones = {
+    "Main Parking": {prefix:"A", states:["open","occupied","occupied","open","soon","occupied","open","occupied","open","occupied"]},
+    "Faculty Parking": {prefix:"F", states:["occupied","open","open","occupied","soon","open","occupied","open","occupied","open"]},
+    "Visitor Parking": {prefix:"V", states:["open","open","occupied","soon","open","occupied","open","occupied","open","soon"]}
+  };
+  const original = JSON.parse(JSON.stringify(zones));
+  let activeZone = "Main Parking";
+  let selectedBest = null;
+  const grid = document.getElementById('smartSlotGrid');
+  const bestSlot = document.getElementById('bestSlot');
+  const bestReason = document.getElementById('bestReason');
+  const bestScore = document.getElementById('bestScore');
+  const message = document.getElementById('demoMessage');
+
+  function scoreFor(state,index){
+    if(state !== 'open' && state !== 'soon') return -1;
+    const distance = 100 - index * 4;
+    const availability = state === 'open' ? 100 : 78;
+    return Math.round(distance * .45 + availability * .45 + (index % 3 === 0 ? 10 : 4));
+  }
+  function render(){
+    const z = zones[activeZone];
+    document.getElementById('zoneSummary').textContent = activeZone;
+    grid.innerHTML='';
+    z.states.forEach((state,i)=>{
+      const b=document.createElement('button'); b.className='slot '+state;
+      const id=z.prefix+String(i+1).padStart(2,'0');
+      b.innerHTML=`<span>${id}</span><small>${state==='open'?'AVAILABLE':state==='soon'?'SOON':state==='reserved'?'RESERVED':'OCCUPIED'}</small>`;
+      b.title=`${id}: ${state}`;
+      b.addEventListener('click',()=>{
+        if(state==='occupied') return;
+        if(state==='reserved'){message.textContent=id+' is already reserved in this demo.';return;}
+        z.states[i]='reserved'; selectedBest=id; bestSlot.textContent=id; bestScore.textContent=scoreFor(state,i)+'/100'; bestReason.textContent='Slot reserved successfully. It is now protected from new recommendations.'; message.textContent=id+' has been reserved. Dashboard updated.'; render(); updateMetrics();
+      });
+      grid.appendChild(b);
+    });
+    updateMetrics();
+  }
+  function updateMetrics(){
+    const all=Object.values(zones).flatMap(z=>z.states); const open=all.filter(x=>x==='open').length; const occupied=all.filter(x=>x==='occupied').length;
+    const best=findBest();
+    document.getElementById('mOpen').textContent=open; document.getElementById('mOpenSub').textContent=(open===1?'1 slot':' '+open+' slots')+' available across zones';
+    document.getElementById('mOcc').textContent=Math.round(occupied/all.length*100)+'%'; document.getElementById('mScore').textContent=best?best.score:'—';
+    document.getElementById('mPred').textContent=Math.max(1,open+3);
+    renderForecast(open);
+  }
+  function findBest(){
+    let best=null;
+    Object.entries(zones).forEach(([zone,z])=>z.states.forEach((state,i)=>{const sc=scoreFor(state,i);if(sc>0 && (!best||sc>best.score))best={zone,id:z.prefix+String(i+1).padStart(2,'0'),score:sc,index:i,state};}));
+    return best;
+  }
+  function chooseBest(){
+    const best=findBest();
+    if(!best){bestSlot.textContent='No slot';bestScore.textContent='—/100';bestReason.textContent='No suitable space is currently available.';return;}
+    activeZone=best.zone; document.querySelectorAll('.zone-tab').forEach(x=>x.classList.toggle('active',x.dataset.zone===activeZone)); selectedBest=best.id;
+    bestSlot.textContent=best.id; bestScore.textContent=best.score+'/100'; bestReason.textContent=`${best.zone} • short walking distance • ${best.state==='open'?'available now':'opening soon'}`; message.textContent=`AI ranked ${best.id} as the best current option.`; render();
+  }
+  function reserve(){
+    if(!selectedBest){chooseBest();return;}
+    const z=zones[activeZone]; const idx=z.states.findIndex((_,i)=>z.prefix+String(i+1).padStart(2,'0')===selectedBest);
+    if(idx<0 || (z.states[idx]!=='open' && z.states[idx]!=='soon')){message.textContent='Please find another best slot.';selectedBest=null;return;}
+    z.states[idx]='reserved'; bestReason.textContent=`${activeZone} • reservation confirmed`; message.textContent=`${selectedBest} reserved successfully. Try Reset Demo to replay the journey.`; render();
+  }
+  function reset(){Object.keys(original).forEach(k=>zones[k].states=[...original[k].states]);selectedBest=null;activeZone='Main Parking';document.querySelectorAll('.zone-tab').forEach(x=>x.classList.toggle('active',x.dataset.zone===activeZone));bestSlot.textContent='—';bestScore.textContent='—/100';bestReason.textContent='Click Find Best Slot to analyze available spaces.';message.textContent='Demo reset. Select a zone or find the best slot.';render();}
+  function renderForecast(open){
+    const vals=[Math.max(2,open-4),Math.max(2,open-1),Math.max(3,open+2),Math.max(4,open+5)]; const labels=['Now','+10 min','+20 min','+30 min']; const max=Math.max(...vals,1);
+    document.getElementById('forecastList').innerHTML=vals.map((v,i)=>`<div class="forecast-row"><span>${labels[i]}</span><div class="forecast-bar"><div class="forecast-fill" style="width:${Math.min(100,v/max*100)}%"></div></div><strong>${v} slots</strong></div>`).join('');
+  }
+  document.querySelectorAll('.zone-tab').forEach(btn=>btn.addEventListener('click',()=>{activeZone=btn.dataset.zone;selectedBest=null;document.querySelectorAll('.zone-tab').forEach(x=>x.classList.toggle('active',x===btn));message.textContent=activeZone+' selected. Click a slot or Find Best Slot.';render();}));
+  document.getElementById('findBest').addEventListener('click',chooseBest); document.getElementById('reserveBest').addEventListener('click',reserve); document.getElementById('resetDemo').addEventListener('click',reset);
+  setInterval(()=>{document.getElementById('sensor1').textContent=(94+Math.floor(Math.random()*5))+'%';document.getElementById('sensor2').textContent=(90+Math.floor(Math.random()*7))+'%';document.getElementById('sensor3').textContent=(96+Math.floor(Math.random()*4))+'%';document.getElementById('sensorUpdate').textContent='Updated just now';},3000);
+  render();
+})();
+</script>
+
+<section class="destination-parking" id="destination-parking">
+  <div class="dp-wrap">
+    <div class="dp-head">
+      <div>
+        <div class="dp-kicker">Destination Parking Intelligence</div>
+        <h2>Going somewhere? Check parking first.</h2>
+        <p>Search a restaurant, mall, hospital or other destination and see simulated parking availability before you leave.</p>
+      </div>
+    </div>
+
+    <div class="dp-search">
+      <input id="dpInput" type="text" placeholder="Search destination, e.g. ABC Restaurant" aria-label="Search destination">
+      <button id="dpSearch">Check Parking</button>
+    </div>
+
+    <div class="dp-suggestions">
+      <button class="dp-chip" data-place="Spice Garden Restaurant">🍽️ Spice Garden Restaurant</button>
+      <button class="dp-chip" data-place="City Center Mall">🛍️ City Center Mall</button>
+      <button class="dp-chip" data-place="Vizag Care Hospital">🏥 Vizag Care Hospital</button>
+    </div>
+
+    <div class="dp-grid">
+      <div class="dp-card">
+        <div class="dp-place">
+          <div><h3 id="dpName">Spice Garden Restaurant</h3><div id="dpAddress">Main Road • 1.8 km away</div></div>
+          <div class="dp-status" id="dpStatus">PARKING AVAILABLE</div>
+        </div>
+
+        <div class="dp-metrics">
+          <div class="dp-metric"><strong id="dpAvailable">18</strong><span>Available now</span></div>
+          <div class="dp-metric"><strong id="dpOccupancy">64%</strong><span>Occupancy</span></div>
+          <div class="dp-metric"><strong id="dpETA">8 min</strong><span>Estimated arrival</span></div>
+        </div>
+
+        <h4>AI prediction for your arrival</h4>
+        <div class="dp-forecast">
+          <div><small>Now</small><b id="f0">18</b><span>slots</span></div>
+          <div><small>+15 min</small><b id="f1">14</b><span>slots</span></div>
+          <div><small>+30 min</small><b id="f2">9</b><span>slots</span></div>
+          <div><small>+45 min</small><b id="f3">6</b><span>slots</span></div>
+        </div>
+
+        <div class="dp-actions">
+          <button class="dp-action" id="dpRoute">🗺️ Show Route</button>
+          <button class="dp-action secondary" id="dpReserve">🅿️ Reserve Best Area</button>
+        </div>
+        <div class="dp-result" id="dpResult"></div>
+        <div class="dp-note">Prototype mode: destination parking values are simulated for the hackathon demo and are not live data from the venue.</div>
+      </div>
+
+      <div class="dp-card">
+        <h3 style="margin-top:0">Where is the parking?</h3>
+        <div class="dp-map" id="dpMap">
+          <div class="dp-road r1"></div><div class="dp-road r2"></div>
+          <div class="dp-route" id="dpRouteLine"></div>
+          <div class="dp-pin restaurant">🍽</div>
+          <div class="dp-pin parking">🅿</div>
+          <div class="dp-label restaurant" id="dpRestaurantLabel">Destination</div>
+          <div class="dp-label parking">Parking Area</div>
+        </div>
+        <div class="dp-note">The route is a visual prototype: <b>Your location → destination → nearby parking area</b>.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<script id="destination-parking-script">
+(function(){
+  const places = {
+    "Spice Garden Restaurant": {address:"Main Road • 1.8 km away",available:18,occ:64,eta:"8 min",forecast:[18,14,9,6]},
+    "City Center Mall": {address:"Central Avenue • 2.6 km away",available:42,occ:58,eta:"11 min",forecast:[42,38,31,25]},
+    "Vizag Care Hospital": {address:"Health District • 3.2 km away",available:7,occ:86,eta:"14 min",forecast:[7,5,3,2]},
+    "ABC Restaurant": {address:"Demo location • 2.1 km away",available:12,occ:72,eta:"9 min",forecast:[12,9,6,4]}
+  };
+  function loadPlace(name){
+    const p=places[name] || places["ABC Restaurant"];
+    document.getElementById("dpName").textContent=name;
+    document.getElementById("dpAddress").textContent=p.address;
+    document.getElementById("dpAvailable").textContent=p.available;
+    document.getElementById("dpOccupancy").textContent=p.occ+"%";
+    document.getElementById("dpETA").textContent=p.eta;
+    ["f0","f1","f2","f3"].forEach((id,i)=>document.getElementById(id).textContent=p.forecast[i]);
+    const status=document.getElementById("dpStatus");
+    status.className="dp-status";
+    if(p.available===0){status.textContent="PARKING FULL";status.classList.add("full")}
+    else if(p.available<10){status.textContent="LIMITED PARKING";status.classList.add("busy")}
+    else status.textContent="PARKING AVAILABLE";
+    document.getElementById("dpResult").textContent="";
+    document.getElementById("dpRestaurantLabel").textContent=name;
+    document.getElementById("dpRouteLine").style.opacity="0";
+  }
+  document.querySelectorAll(".dp-chip").forEach(b=>b.addEventListener("click",()=>{document.getElementById("dpInput").value=b.dataset.place;loadPlace(b.dataset.place)}));
+  document.getElementById("dpSearch").addEventListener("click",()=>{const v=document.getElementById("dpInput").value.trim();if(v)loadPlace(v)});
+  document.getElementById("dpInput").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("dpSearch").click()});
+  document.getElementById("dpRoute").addEventListener("click",()=>{
+    document.getElementById("dpRouteLine").style.opacity="1";
+    document.getElementById("dpResult").textContent="Route ready: follow the highlighted path to the parking area.";
+  });
+  document.getElementById("dpReserve").addEventListener("click",()=>{
+    document.getElementById("dpResult").textContent="Best parking area marked for reservation (prototype demo).";
+  });
+  loadPlace("Spice Garden Restaurant");
+})();
+</script>
+
+</body>
+</html>
